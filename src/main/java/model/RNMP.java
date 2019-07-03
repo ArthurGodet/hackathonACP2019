@@ -31,6 +31,7 @@ public class RNMP {
 		model = new Model("RNMP");
 
 		makeObj();
+		makePrecedences();
 
 	}
 	
@@ -44,6 +45,12 @@ public class RNMP {
 	
 	public void makeObj() {
 		// TODO
-	} 
+1	}
+
+	public void makePrecedences() {
+		for(int i = 0; i < instance.precedences.length; ++i){
+			model.arithm(getEndWorksheet(instance.precedences[i][0]) , "<=", getStartWorksheet(instance.precedences[i][1])).post();
+		}
+	}
 
 }
