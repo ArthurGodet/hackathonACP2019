@@ -1,5 +1,6 @@
 package model;
 
+import data.input.RoadMaxBlock;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
@@ -73,6 +74,19 @@ public class RNMP {
 	public void makePrecedences() {
 		for(int i = 0; i < instance.precedences.length; ++i){
 			model.arithm(getEndWorksheet(instance.precedences[i][0]) , "<=", getStartWorksheet(instance.precedences[i][1])).post();
+		}
+	}
+
+
+	public void makeMaxRoadSim() {
+		for(RoadMaxBlock rmd : instance.roadsBlocked){
+			for(int t = 0; t < roadPerturbation.length; ++t){
+				BoolVar[] tmpBoolVarArray = new BoolVar[rmd.roadsID.length];
+				for(int i = 0; i < rmd.roadsID.length; ++i){
+					tmpBoolVarArray[i] = roadPerturbation[rmd.roadsID[i]][t];
+				}
+				model.sum(tmpBoolVarArray, "<=", rmd.nbMaxBlocked).post();
+			}
 		}
 	}
 
