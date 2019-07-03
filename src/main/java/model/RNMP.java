@@ -20,19 +20,20 @@ public class RNMP {
 
 	// INSTANCE
 	Instance instance;
-
+	
 	// MODEL
 	Model model;
 
 	// VARIABLESt
 	BoolVar[] isDone; // g[w]=1 iff w is done
-	BoolVar[][] roadsPerturbation; // roadsPertubation[roads][time]
-
+	BoolVar[][] roadsPerturbation; // roadPertubation[roads][time]
+	
 	// OBJECTIF
 	IntVar obj;
 
 	// TASKS
 	Task[][] tasks;
+	
 
 	public RNMP(Instance instance) {
 		this.instance = instance;
@@ -46,11 +47,11 @@ public class RNMP {
 
 		makeObj();
 	}
-
+	
 	public IntVar getStartWorksheet(int i) {
 		return tasks[i][0].getStart();
 	}
-
+	
 	public IntVar getEndWorksheet(int i) {
 		return tasks[i][tasks.length - 1].getEnd();
 	}
@@ -90,13 +91,13 @@ public class RNMP {
 			}
 			model.arithm(getStartWorksheet(i), ">=", instance.worksheets[i].est).post(); // est
 			model.arithm(getStartWorksheet(i), "<=", instance.worksheets[i].lst).post(); // lst
-			model.arithm(isDone[i], "=", instance.worksheets[i].mandatory).post(); // mandatory
+			model.arithm(isDone[i], ">=", instance.worksheets[i].mandatory).post(); // mandatory
 
 			model.arithm(getStartWorksheet(i), "-", isDone[i].mul(instance.horizon).intVar(), "<=", instance.worksheets[i].est).post();
 		}
 
 	}
-
+	
 	public void makeObj() {
 		int min = 0;
 		int sum = 0;
