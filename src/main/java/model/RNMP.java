@@ -1,6 +1,7 @@
 package model;
 
 import org.chocosolver.solver.Model;
+import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.Task;
@@ -17,7 +18,7 @@ public class RNMP {
 
 	// VARIABLESt
 	BoolVar[] isDone; // g[w]=1 iff w is done
-	BoolVar[][] roadPerturbation; // roadPertubation[roads][time]
+	BoolVar[][] roadsPerturbation; // roadsPertubation[roads][time]
 	
 	// OBJECTIF
 	IntVar obj;
@@ -30,6 +31,7 @@ public class RNMP {
 		model = new Model("RNMP");
 
 		makeTasksAndIsDone();
+		makePerturbation();
 
 		makeObj();
 
@@ -41,6 +43,11 @@ public class RNMP {
 	
 	public IntVar getEndWorksheet(int i) {
 		return tasks[i][tasks.length-1].getEnd();
+	}
+
+	public void makePerturbation() {
+		roadsPerturbation = model.boolVarMatrix("roadsPerturbation", instance.roadsCost.length, instance.horizon);
+		model.post(new Constraint("CHANNELING_CONSTRAINT", new PropChannelingRoadPerturbation(instance, tasks, isDone, roadsPerturbation)));
 	}
 
 	public void makeTasksAndIsDone() {
