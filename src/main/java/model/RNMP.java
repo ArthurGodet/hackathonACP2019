@@ -36,6 +36,7 @@ public class RNMP {
 		makeObj();
 		makePrecedences();
 		constraintWorkRessources();
+		
 
 	}
 
