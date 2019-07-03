@@ -74,9 +74,9 @@ public class RNMP {
 			}
 			model.arithm(getStartWorksheet(i), ">=", instance.worksheets[i].est).post(); // est
 			model.arithm(getStartWorksheet(i), "<=", instance.worksheets[i].lst).post(); // lst
-			model.arithm(isDone[i], "=", instance.worksheets[i].mandatory).post(); // mandatory
+			model.arithm(isDone[i], ">=", instance.worksheets[i].mandatory).post(); // mandatory
 
-			model.arithm(getStartWorksheet(i), "<=", isDone[i].mul(instance.horizon).intVar()).post();
+			model.arithm(getStartWorksheet(i), "-", isDone[i].mul(instance.horizon).intVar(), "<=", instance.worksheets[i].est).post();
 		}
 
 	}
