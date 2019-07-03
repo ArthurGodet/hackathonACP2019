@@ -12,13 +12,14 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Scanner;
 
 public class Reader {
 
     public static Instance readInstance(String path) throws IOException {
         Instance instance = new Instance();
+        File file = new File(path);
+        instance.name = file.getName().substring(0, file.getName().length()-4);
         Scanner scanner = new Scanner(new FileReader(path));
 
         // Read instance info
@@ -105,7 +106,7 @@ public class Reader {
         for(File f : folder.listFiles()) {
             System.out.println(f.getName());
             Instance inst = readInstance(f.getPath());
-            Factory.toFile("data/"+f.getName().substring(0, f.getName().length()-4)+".json", inst);
+            Factory.toFile("data/"+inst.name+".json", inst);
         }
     }
 }

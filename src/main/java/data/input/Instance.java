@@ -5,6 +5,7 @@
 package data.input;
 
 public class Instance {
+    public String name;
     public int horizon;
     public int[][] roadsCost;
     public int[] workCenters;

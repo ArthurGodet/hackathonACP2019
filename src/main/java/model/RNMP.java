@@ -1,9 +1,14 @@
 package model;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Arrays;
 
+import data.input.RoadMaxBlock;
+import data.input.Worksheet;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.Task;
@@ -29,7 +34,8 @@ public class RNMP {
 	// TASKS
 	Task[][] tasks;
 
-	public RNMP() {
+	public RNMP(Instance instance) {
+		this.instance = instance;
 		model = new Model("RNMP");
 
 		makeTasksAndIsDone();
@@ -39,7 +45,6 @@ public class RNMP {
 		constraintWorkRessources();
 
 		makeObj();
-
 	}
 
 	public IntVar getStartWorksheet(int i) {
@@ -53,6 +58,17 @@ public class RNMP {
 	public void makePerturbation() {
 		roadsPerturbation = model.boolVarMatrix("roadsPerturbation", instance.roadsCost.length, instance.horizon);
 		model.post(new Constraint("CHANNELING_CONSTRAINT", new PropChannelingRoadPerturbation(instance, tasks, isDone, roadsPerturbation)));
+
+		BoolVar[] roadsBlockedMax;
+		for(RoadMaxBlock rmb : instance.roadsBlocked) {
+			roadsBlockedMax = new BoolVar[rmb.roadsID.length];
+			for(int t = 0; t<instance.horizon; t++) {
+				for(int k = 0; k<roadsBlockedMax.length; k++) {
+					roadsBlockedMax[k] = roadsPerturbation[rmb.roadsID[k]][t];
+				}
+				model.sum(roadsBlockedMax, "<=", rmb.nbMaxBlocked).post();
+			}
+		}
 	}
 
 	public void makeTasksAndIsDone() {
@@ -76,14 +92,51 @@ public class RNMP {
 			model.arithm(getStartWorksheet(i), "<=", instance.worksheets[i].lst).post(); // lst
 			model.arithm(isDone[i], "=", instance.worksheets[i].mandatory).post(); // mandatory
 
-			model.arithm(getStartWorksheet(i), "<=", isDone[i].mul(instance.horizon).intVar()).post();
+			model.arithm(getStartWorksheet(i), "-", isDone[i].mul(instance.horizon).intVar(), "<=", instance.worksheets[i].est).post();
 		}
 
 	}
 
 	public void makeObj() {
-		// TODO
+		int min = 0;
+		int sum = 0;
+		for(Worksheet ws : instance.worksheets) {
+			sum += ws.importance;
+		}
+		for(int i = 0; i<instance.roadsCost.length; i++) {
+			for(int j = 0; j<instance.roadsCost[i].length; j++) {
+				min = Math.min(min, -instance.roadsCost[i][j]);
+			}
+		}
 
+		obj = model.intVar("obj", min, sum);
+
+		IntVar sumUrgency = model.intVar("maxUrgency", 0, sum);
+		int[] importances = Arrays.stream(instance.worksheets).mapToInt(ws -> ws.importance).toArray();
+		model.scalar(isDone, importances, "=", sumUrgency).post();
+
+		IntVar maxPerturbation = model.intVar("maxPerturbation", 0, -min);
+		IntVar[][] perturbations = new IntVar[instance.roadsCost.length][];
+		for(int i = 0; i<instance.roadsCost.length; i++) {
+			perturbations[i] = new IntVar[instance.roadsCost[i].length];
+			for(int j = 0; j<instance.roadsCost[i].length; j++) {
+				perturbations[i][j] = model.intVar("perturbations["+i+"]["+j+"]", new int[]{0, instance.roadsCost[i][j]});
+				model.times(roadsPerturbation[i][j], instance.roadsCost[i][j], perturbations[i][j]).post();
+			}
+		}
+		model.max(maxPerturbation, ArrayUtils.flatten(perturbations)).post();
+
+		model.arithm(sumUrgency, "-", maxPerturbation, "=", obj).post();
+
+		model.setObjective(true, obj);
+
+		// TODO
+		IntVar[] decVars = new IntVar[2*isDone.length];
+		for(int i = 0; i<decVars.length; i+=2) {
+			decVars[i] = isDone[i/2];
+			decVars[i+1] = getStartWorksheet(i/2);
+		}
+		model.getSolver().setSearch(Search.inputOrderLBSearch(decVars));
 	}
 
 	public void constraintWorkRessources() {
@@ -102,9 +155,9 @@ public class RNMP {
 			int idx = 0;
 			for (int w = 0; w < tasks.length; w++) {
 				if (instance.worksheets[w].workCenterID == center) {
-					tasksCenter = ArrayUtils.append(tasksCenter, tasks[w]);
 					for (int a = 0; a < tasks[w].length; a++) {
 						// Amount of workers needed for tasks[w][a]
+						tasksCenter[idx] = tasks[w][a];
 						heights[idx] = model.intVar(instance.worksheets[w].amountOfWorkers[a]);
 						idx++;
 					}
@@ -118,9 +171,27 @@ public class RNMP {
 
 	public void makePrecedences() {
 		for (int i = 0; i < instance.precedences.length; ++i) {
-			model.arithm(getEndWorksheet(instance.precedences[i][0]), "<=",
-					getStartWorksheet(instance.precedences[i][1])).post();
+			int i1 = instance.precedences[i][0];
+			int i2 = instance.precedences[i][1];
+			model.post(new Constraint("PRECEDENCES_CONSTRAINT",
+					new PropPrecedences(isDone[i1], getEndWorksheet(i1), isDone[i2], getStartWorksheet(i2))));
 		}
 	}
 
+	public void solve(String timeLimit) throws IOException {
+		if(timeLimit != null) {
+			model.getSolver().limitTime(timeLimit);
+		}
+		int[] best = null;
+
+		while(model.getSolver().solve()) {
+			best = Arrays.stream(tasks).map(array -> array[0].getStart()).mapToInt(IntVar::getValue).toArray();
+		}
+
+		FileWriter fw = new FileWriter("results/"+instance.name+".txt");
+		for(int i = 0; i<best.length; i++) {
+			fw.write(i+" "+best[i]+"\n");
+		}
+		fw.close();
+	}
 }
