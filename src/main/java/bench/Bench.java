@@ -7,6 +7,7 @@ package bench;
 import data.Factory;
 import data.input.Instance;
 import model.RNMP;
+import model.RNMPEasy;
 import org.chocosolver.solver.exception.ContradictionException;
 
 import java.io.File;
@@ -20,8 +21,13 @@ public class Bench {
         if(!"all".equals(args[1])) {
             Instance instance = Factory.fromFile("data/"+args[1]+".json", Instance.class);
             System.out.println(instance.name);
-            RNMP rnmp = new RNMP(instance);
-            rnmp.solve(args[0]);
+            if(instance.name.contains("EASY")) {
+                RNMPEasy rnmpEasy = new RNMPEasy(instance);
+                rnmpEasy.solve(args[0]);
+            } else {
+                RNMP rnmp = new RNMP(instance);
+                rnmp.solve(args[0]);
+            }
             System.in.read();
         } else {
             File folder = new File("data/");

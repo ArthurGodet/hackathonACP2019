@@ -139,20 +139,15 @@ public class RNMP {
 		model.scalar(isDone, importances, "=", sumUrgency).post();
 
 		IntVar maxPerturbation = model.intVar("maxPerturbation", 0, -min);
-		IntVar[][] perturbations = new IntVar[instance.roadsCost.length][instance.horizon];
-		for(int i = 0; i<instance.roadsCost.length; i++) {
-			for(int j = 0; j<instance.roadsCost[i].length; j++) {
-				perturbations[i][j] = model.intVar("perturbations["+i+"]["+j+"]", new int[]{0, instance.roadsCost[i][j]});
-				model.times(roadsPerturbation[i][j], instance.roadsCost[i][j], perturbations[i][j]).post();
-			}
-		}
 		IntVar[] sumPerturbation = model.intVarArray("sumPerturbation", instance.horizon, 0, -min);
-		for(int t = 0; t<instance.horizon; t++) {
-			IntVar[] tmp = new IntVar[instance.roadsCost.length];
-			for(int i = 0; i<tmp.length; i++) {
-				tmp[i] = perturbations[i][t];
+		for(int j = 0; j<sumPerturbation.length; j++) {
+			int[] coefs = new int[roadsPerturbation.length];
+			IntVar[] tmp = new IntVar[roadsPerturbation.length];
+			for(int i = 0; i<roadsPerturbation.length; i++) {
+				coefs[i] = instance.roadsCost[i][j];
+				tmp[i] = roadsPerturbation[i][j];
 			}
-			model.sum(tmp, "=", sumPerturbation[t]).post();
+			model.scalar(tmp, coefs, "=", sumPerturbation[j]).post();
 		}
 		model.max(maxPerturbation, sumPerturbation).post();
 
@@ -373,7 +368,7 @@ public class RNMP {
 	}
 
 	public static void main(String[] args) throws IOException, ContradictionException{
-		String instanceName = "MEDIUM_1000_100";
+		String instanceName = "HARD_5000_1500";
 		Instance instance = Factory.fromFile("data/"+instanceName+".json", Instance.class);
 		int obj = computeObjectiveOfSolution(instance, "results/"+instanceName+".txt");
 		System.out.println(obj);
