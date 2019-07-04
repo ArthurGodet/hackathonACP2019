@@ -1,13 +1,18 @@
 package model;
 
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Scanner;
 
+import data.Factory;
 import data.input.RoadMaxBlock;
 import data.input.Worksheet;
+import org.chocosolver.solver.Cause;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.constraints.Constraint;
+import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.search.strategy.selectors.values.IntValueSelector;
 import org.chocosolver.solver.search.strategy.selectors.variables.VariableSelector;
@@ -19,9 +24,13 @@ import org.chocosolver.util.tools.ArrayUtils;
 import data.input.Instance;
 
 public class RNMP {
+	public static final int EASY = 0;
+	public static final int MEDIUM = 1;
+	public static final int HARD = 2;
 
 	// INSTANCE
 	Instance instance;
+	int difficulty;
 	
 	// MODEL
 	Model model;
@@ -39,13 +48,22 @@ public class RNMP {
 
 	public RNMP(Instance instance) {
 		this.instance = instance;
+		if(instance.name.contains("EASY")) {
+			difficulty = EASY;
+		} else if(instance.name.contains("MEDIUM")) {
+			difficulty = MEDIUM;
+		} else {
+			difficulty = HARD;
+		}
 		model = new Model("RNMP");
 
 		makeTasksAndIsDone();
 		makePerturbation();
 
 		makePrecedences();
-		constraintWorkRessources();
+		if(difficulty != EASY) {
+			constraintWorkRessources();
+		}
 
 		makeObj();
 		makeSearch();
@@ -63,14 +81,16 @@ public class RNMP {
 		roadsPerturbation = model.boolVarMatrix("roadsPerturbation", instance.roadsCost.length, instance.horizon);
 		model.post(new Constraint("CHANNELING_CONSTRAINT", new PropChannelingRoadPerturbation(instance, tasks, isDone, roadsPerturbation)));
 
-		BoolVar[] roadsBlockedMax;
-		for(RoadMaxBlock rmb : instance.roadsBlocked) {
-			roadsBlockedMax = new BoolVar[rmb.roadsID.length];
-			for(int t = 0; t<instance.horizon; t++) {
-				for(int k = 0; k<roadsBlockedMax.length; k++) {
-					roadsBlockedMax[k] = roadsPerturbation[rmb.roadsID[k]][t];
+		if(difficulty == HARD) {
+			BoolVar[] roadsBlockedMax;
+			for(RoadMaxBlock rmb : instance.roadsBlocked) {
+				roadsBlockedMax = new BoolVar[rmb.roadsID.length];
+				for(int t = 0; t<instance.horizon; t++) {
+					for(int k = 0; k<roadsBlockedMax.length; k++) {
+						roadsBlockedMax[k] = roadsPerturbation[rmb.roadsID[k]][t];
+					}
+					model.sum(roadsBlockedMax, "<=", rmb.nbMaxBlocked).post();
 				}
-				model.sum(roadsBlockedMax, "<=", rmb.nbMaxBlocked).post();
 			}
 		}
 	}
@@ -79,11 +99,7 @@ public class RNMP {
 		tasks = new Task[instance.worksheets.length][];
 		isDone = model.boolVarArray("isDone", instance.worksheets.length);
 		for (int i = 0; i < tasks.length; i++) {
-			tasks[i] = new Task[instance.worksheets[i].duration]; // TODO can be
-																	// improved
-																	// if all
-																	// conso are
-																	// identical
+			tasks[i] = new Task[instance.worksheets[i].duration];
 			for (int j = 0; j < tasks[i].length; j++) {
 				IntVar start = model.intVar("start[" + i + "][" + j + "]", 0, instance.horizon);
 				IntVar end = model.intVar("end[" + i + "][" + j + "]", 0, instance.horizon);
@@ -144,58 +160,75 @@ public class RNMP {
 		model.setObjective(true, obj);
 	}
 
-	boolean isDoneVar;
-	Integer idx = null;
-
 	public void makeSearch() {
 		IntVar[] decVars = new IntVar[2*isDone.length];
 		for(int i = 0; i<decVars.length; i+=2) {
 			decVars[i] = isDone[i/2];
 			decVars[i+1] = getStartWorksheet(i/2);
 		}
-		model.getSolver().setSearch(Search.inputOrderUBSearch(decVars));
+
 		/*
-		// TODO --> select first isDone for which importance is higher and instantiate to UB, then corresponding start and instantiate to LB
+		model.getSolver().setSearch(Search.inputOrderUBSearch(decVars));
+		//*/
+		/* TO ENSURE TO HAVE A SOLUTION
 		model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
 			@Override
 			public IntVar getVariable(IntVar[] variables) {
-				if(idx != null) {
-					isDoneVar = false;
-					return getStartWorksheet(idx);
-				} else {
-					isDoneVar = false;
-					IntVar res = null;
-					idx = null;
-					Integer bestImportance = null;
-					for(int i = 0; i<isDone.length; i++) {
-						if(!isDone[i].isInstantiated() && (res==null || instance.worksheets[i].importance > bestImportance)) {
-							bestImportance = instance.worksheets[i].importance;
-							res = isDone[i];
-							idx = i;
-							isDoneVar = true;
-						}
+				for(int i = 0; i<isDone.length; i++) {
+					if(isDone[i].isInstantiatedTo(1) && !getStartWorksheet(i).isInstantiated()) {
+						return getStartWorksheet(i);
 					}
-					if(res == null) {
-						for(int i = 0; i<tasks.length; i++) {
-							if(!getStartWorksheet(i).isInstantiated()) {
-								return getStartWorksheet(i);
-							}
-						}
-					}
-
-					return res;
 				}
+				for(int i = 0; i<isDone.length; i++) {
+					if(!isDone[i].isInstantiated()) {
+						return isDone[i];
+					}
+				}
+				for(int i = 0; i<isDone.length; i++) {
+					if(!getStartWorksheet(i).isInstantiated()) {
+						return getStartWorksheet(i);
+					}
+				}
+				return null;
 			}
 		}, new IntValueSelector() {
 			@Override
 			public int selectValue(IntVar var) {
-				if (isDoneVar) {
-					isDoneVar = false;
-					return var.getUB();
-				} else {
-					idx = null;
-					return var.getLB();
+				return var.getLB();
+			}
+		}, decVars));
+		//*/
+		//* HOME-MADE SEARCH
+		model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
+			@Override
+			public IntVar getVariable(IntVar[] variables) {
+				for(int i = 0; i<isDone.length; i++) {
+					if(isDone[i].isInstantiatedTo(1) && !getStartWorksheet(i).isInstantiated()) {
+						return getStartWorksheet(i);
+					}
 				}
+				Integer bestImportance = null;
+				Integer idx = null;
+				for(int i = 0; i<isDone.length; i++) {
+					if(!isDone[i].isInstantiated() && (idx==null || bestImportance<instance.worksheets[i].importance)) {
+						bestImportance = instance.worksheets[i].importance;
+						idx = i;
+					}
+				}
+				if(idx != null) {
+					return isDone[idx];
+				}
+				for(int i = 0; i<isDone.length; i++) {
+					if(!getStartWorksheet(i).isInstantiated()) {
+						return getStartWorksheet(i);
+					}
+				}
+				return null;
+			}
+		}, new IntValueSelector() {
+			@Override
+			public int selectValue(IntVar var) {
+				return var.getUB();
 			}
 		}, decVars));
 		//*/
@@ -247,13 +280,6 @@ public class RNMP {
 		int[][] best = null;
 
 		while(model.getSolver().solve()) {
-//			System.out.println(Arrays.toString(isDone));
-//			System.out.println(Arrays.toString(Arrays.stream(tasks).map(array -> array[0].getStart()).toArray(IntVar[]::new)));
-//			System.out.println("----");
-//			for(int i = 0; i<roadsPerturbation.length; i++) {
-//				System.out.println(Arrays.toString(roadsPerturbation[i]));
-//			}
-
 			int nbDone = (int) Arrays.stream(isDone).filter(b -> b.isInstantiatedTo(1)).count();
 			best = new int[nbDone][2];
 			int k = 0;
@@ -267,6 +293,8 @@ public class RNMP {
 			System.out.println(instance.name+" -> "+obj.getValue()+" : "+Arrays.deepToString(best));
 		}
 
+		model.getSolver().printStatistics();
+
 		if(best != null) {
 			FileWriter fw = new FileWriter("results/"+instance.name+".txt");
 			for(int i = 0; i<best.length; i++) {
@@ -274,5 +302,33 @@ public class RNMP {
 			}
 			fw.close();
 		}
+	}
+
+
+	public static int computeObjectiveOfSolution(Instance instance, String path) throws IOException, ContradictionException {
+		RNMP rnmp = new RNMP(instance);
+		Scanner scanner = new Scanner(new FileReader(path));
+		while(scanner.hasNextLine()) {
+			String[] line = scanner.nextLine().split(" ");
+			int id = Integer.parseInt(line[0]);
+			int start = Integer.parseInt(line[1]);
+			rnmp.isDone[id].instantiateTo(1, Cause.Null);
+			rnmp.getStartWorksheet(id).instantiateTo(start, Cause.Null);
+		}
+		scanner.close();
+		for(int i = 0; i<rnmp.isDone.length; i++) {
+			if(!rnmp.isDone[i].isInstantiated()) {
+				rnmp.isDone[i].instantiateTo(0, Cause.Null);
+			}
+		}
+		rnmp.model.getSolver().propagate();
+		return rnmp.obj.getValue();
+	}
+
+	public static void main(String[] args) throws IOException, ContradictionException{
+		String instanceName = "MEDIUM_1000_100";
+		Instance instance = Factory.fromFile("data/"+instanceName+".json", Instance.class);
+		int obj = computeObjectiveOfSolution(instance, "results/"+instanceName+".txt");
+		System.out.println(obj);
 	}
 }

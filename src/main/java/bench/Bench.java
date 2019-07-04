@@ -20,6 +20,7 @@ public class Bench {
             if(!new File("results/"+instance.name+".txt").exists()) {
                 RNMP rnmp = new RNMP(instance);
                 rnmp.solve(args[0]);
+                System.in.read();
             }
         } else {
             File folder = new File("data/");
