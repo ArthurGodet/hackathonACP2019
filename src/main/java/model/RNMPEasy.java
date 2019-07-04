@@ -6,10 +6,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.Scanner;
 
 import data.Factory;
 import data.input.Worksheet;
+import gnu.trove.list.array.TIntArrayList;
 import org.chocosolver.solver.Cause;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
@@ -164,7 +166,7 @@ public class RNMPEasy {
 //                } else {
                     int bestStart = -1;
                     int lessInc = Integer.MAX_VALUE;
-                    for(int t = var.getLB(); t<=var.getUB(); t++) {
+                    for(int t = var.getLB(); t<=var.getUB(); t=var.nextValue(t)) {
                         int inc = computeIncreasePerturbation(id, t);
                         if(inc < lessInc) {
                             lessInc = inc;
@@ -175,6 +177,48 @@ public class RNMPEasy {
 //                }
             }
         }, decVars));
+        //*
+        Random rnd = new Random(0);
+        TIntArrayList list = new TIntArrayList();
+        model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
+            @Override
+            public IntVar getVariable(IntVar[] variables) {
+                list.clear();
+                for(int i = 0; i<decVars.length; i++) {
+                    if(!decVars[i].isInstantiated()) {
+                        list.add(i);
+                    }
+                }
+                if(list.size() == 0) {
+                    return null;
+                } else {
+                    return decVars[list.getQuick(rnd.nextInt(list.size()))];
+                }
+            }
+        }, new IntValueSelector() {
+            @Override
+            public int selectValue(IntVar var) {
+//                return var.getUB();
+                int id = -1;
+                for(int i = 0; i<nbPrecedences.length; i++) {
+                    if(getStartWorksheet(i).equals(var)) {
+                        id = i;
+                        break;
+                    }
+                }
+                int bestStart = -1;
+                int lessInc = Integer.MAX_VALUE;
+                for(int t = var.getLB(); t<=var.getUB(); t++) {
+                    int inc = computeIncreasePerturbation(id, t);
+                    if(inc < lessInc) {
+                        lessInc = inc;
+                        bestStart = t;
+                    }
+                }
+                return bestStart;
+            }
+        }, decVars));
+        //*/
     }
 
     private int computeIncreasePerturbation(int id, int start) {

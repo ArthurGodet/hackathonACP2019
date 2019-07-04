@@ -6,11 +6,13 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.Scanner;
 
 import data.Factory;
 import data.input.RoadMaxBlock;
 import data.input.Worksheet;
+import gnu.trove.list.array.TIntArrayList;
 import org.chocosolver.solver.Cause;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.Solution;
@@ -230,10 +232,76 @@ public class RNMP {
 		}, new IntValueSelector() {
 			@Override
 			public int selectValue(IntVar var) {
+//				return var.getUB();
+				int id = -1;
+				for(int i = 0; i<isDone.length+tasks.length; i++) {
+					if(i<isDone.length && isDone[i].equals(var) ||
+							i>=isDone.length && getStartWorksheet(i-isDone.length).equals(var)) {
+						id = i;
+						break;
+					}
+				}
+				if(id<isDone.length) {
+					return var.getUB();
+				}
+				id -= isDone.length;
+				int bestStart = -1;
+				int lessInc = Integer.MAX_VALUE;
+				for(int t = var.getLB(); t<=var.getUB(); t=var.nextValue(t)) {
+					int inc = computeIncreasePerturbation(id, t);
+					if(inc < lessInc) {
+						lessInc = inc;
+						bestStart = t;
+					}
+				}
+				return bestStart;
+			}
+		}, decVars));
+		//*/
+		/*
+		Random rnd = new Random(0);
+		TIntArrayList list = new TIntArrayList();
+		model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
+			@Override
+			public IntVar getVariable(IntVar[] variables) {
+				list.clear();
+				for(int i = 0; i<decVars.length; i++) {
+					if(!decVars[i].isInstantiated()) {
+						list.add(i);
+					}
+				}
+				if(list.size() == 0) {
+					return null;
+				} else {
+					return decVars[list.getQuick(rnd.nextInt(list.size()))];
+				}
+			}
+		}, new IntValueSelector() {
+			@Override
+			public int selectValue(IntVar var) {
 				return var.getUB();
 			}
 		}, decVars));
 		//*/
+	}
+
+	private int computeIncreasePerturbation(int id, int start) {
+		int inc = 0;
+		for(int k = 0; k<instance.worksheets[id].duration; k++) {
+			int idRoad = instance.worksheets[id].roadsID[k];
+			if(!roadsPerturbation[idRoad][start+k].isInstantiated()) {
+				inc += instance.roadsCost[idRoad][start+k];
+			}
+		}
+		return inc;
+	}
+
+	private static int computeNbPrec(ArrayList<Integer>[] prec, int i) {
+		int sum = 0;
+		for(int p : prec[i]) {
+			sum += 1+computeNbPrec(prec, p);
+		}
+		return sum;
 	}
 
 	public void constraintWorkRessources() {
@@ -369,6 +437,7 @@ public class RNMP {
 		});
 
 		model.getSolver().setLNS(INeighborFactory.blackBox(ivars), new FailCounter(model.getSolver(), 100));
+
 		Solution solution = model.getSolver().findOptimalSolution(obj, Model.MAXIMIZE);
 
 		if(bestKnown<solution.getIntVal(obj)) {
