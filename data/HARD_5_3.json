@@ -36,10 +36,10 @@
   } ],
   "roadsBlocked" : [ {
     "nbMaxBlocked" : 2,
-    "roadsID" : [ 1, 2, 3, 4, 5 ]
+    "roadsID" : [ 0, 1, 2, 3, 4 ]
   }, {
     "nbMaxBlocked" : 2,
-    "roadsID" : [ 3, 4, 5 ]
+    "roadsID" : [ 2, 3, 4 ]
   } ],
   "precedences" : [ [ 2, 0 ] ],
   "nbActivities" : 8

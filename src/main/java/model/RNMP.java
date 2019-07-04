@@ -144,7 +144,7 @@ public class RNMP {
 		model.setObjective(true, obj);
 	}
 
-	boolean isDoneVar = false;
+	boolean isDoneVar;
 	Integer idx = null;
 
 	public void makeSearch() {
@@ -153,33 +153,36 @@ public class RNMP {
 			decVars[i] = isDone[i/2];
 			decVars[i+1] = getStartWorksheet(i/2);
 		}
-//		model.getSolver().setSearch(Search.inputOrderLBSearch(decVars));
-		//*
+		model.getSolver().setSearch(Search.inputOrderUBSearch(decVars));
+		/*
 		// TODO --> select first isDone for which importance is higher and instantiate to UB, then corresponding start and instantiate to LB
 		model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
 			@Override
 			public IntVar getVariable(IntVar[] variables) {
 				if(idx != null) {
+					isDoneVar = false;
 					return getStartWorksheet(idx);
 				} else {
-					isDoneVar = true;
+					isDoneVar = false;
 					IntVar res = null;
-					int bestImportance = Integer.MIN_VALUE;
-					for(int i = 0; i<instance.worksheets.length; i++) {
+					idx = null;
+					Integer bestImportance = null;
+					for(int i = 0; i<isDone.length; i++) {
 						if(!isDone[i].isInstantiated() && (res==null || instance.worksheets[i].importance > bestImportance)) {
 							bestImportance = instance.worksheets[i].importance;
 							res = isDone[i];
 							idx = i;
+							isDoneVar = true;
 						}
 					}
-					if(idx == null) {
-						isDoneVar = false;
+					if(res == null) {
 						for(int i = 0; i<tasks.length; i++) {
 							if(!getStartWorksheet(i).isInstantiated()) {
 								return getStartWorksheet(i);
 							}
 						}
 					}
+
 					return res;
 				}
 			}
@@ -241,19 +244,35 @@ public class RNMP {
 		if(timeLimit != null) {
 			model.getSolver().limitTime(timeLimit);
 		}
-		int[] best = null;
+		int[][] best = null;
 
 		while(model.getSolver().solve()) {
-			best = Arrays.stream(tasks).map(array -> array[0].getStart()).mapToInt(IntVar::getValue).toArray();
-			System.out.println(obj.getValue()+" : "+Arrays.toString(best));
+//			System.out.println(Arrays.toString(isDone));
+//			System.out.println(Arrays.toString(Arrays.stream(tasks).map(array -> array[0].getStart()).toArray(IntVar[]::new)));
+//			System.out.println("----");
+//			for(int i = 0; i<roadsPerturbation.length; i++) {
+//				System.out.println(Arrays.toString(roadsPerturbation[i]));
+//			}
+
+			int nbDone = (int) Arrays.stream(isDone).filter(b -> b.isInstantiatedTo(1)).count();
+			best = new int[nbDone][2];
+			int k = 0;
+			for(int i = 0; i<isDone.length; i++) {
+				if(isDone[i].isInstantiatedTo(1)) {
+					best[k][0] = i;
+					best[k][1] = getStartWorksheet(i).getValue();
+					k++;
+				}
+			}
+			System.out.println(instance.name+" -> "+obj.getValue()+" : "+Arrays.deepToString(best));
 		}
 
-		FileWriter fw = new FileWriter("results/"+instance.name+".txt");
 		if(best != null) {
+			FileWriter fw = new FileWriter("results/"+instance.name+".txt");
 			for(int i = 0; i<best.length; i++) {
-				fw.write(i+" "+best[i]+"\n");
+				fw.write(best[i][0]+" "+best[i][1]+" "+"\n");
 			}
+			fw.close();
 		}
-		fw.close();
 	}
 }

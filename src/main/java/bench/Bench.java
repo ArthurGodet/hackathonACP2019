@@ -14,12 +14,12 @@ import java.io.IOException;
 public class Bench {
 
     public static void main(String[] args) throws IOException {
-        if("all".equals(args[1])) {
+        if(!"all".equals(args[1])) {
             Instance instance = Factory.fromFile("data/"+args[1]+".json", Instance.class);
             System.out.println(instance.name);
             if(!new File("results/"+instance.name+".txt").exists()) {
                 RNMP rnmp = new RNMP(instance);
-                rnmp.solve("5m");
+                rnmp.solve(args[0]);
             }
         } else {
             File folder = new File("data/");
