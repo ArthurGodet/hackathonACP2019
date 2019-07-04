@@ -9,6 +9,8 @@ import data.input.Worksheet;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.search.strategy.Search;
+import org.chocosolver.solver.search.strategy.selectors.values.IntValueSelector;
+import org.chocosolver.solver.search.strategy.selectors.variables.VariableSelector;
 import org.chocosolver.solver.variables.BoolVar;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.Task;
@@ -46,6 +48,7 @@ public class RNMP {
 		constraintWorkRessources();
 
 		makeObj();
+		makeSearch();
 	}
 	
 	public IntVar getStartWorksheet(int i) {
@@ -53,7 +56,7 @@ public class RNMP {
 	}
 	
 	public IntVar getEndWorksheet(int i) {
-		return tasks[i][tasks.length - 1].getEnd();
+		return tasks[i][tasks[i].length - 1].getEnd();
 	}
 
 	public void makePerturbation() {
@@ -104,10 +107,12 @@ public class RNMP {
 		for(Worksheet ws : instance.worksheets) {
 			sum += ws.importance;
 		}
-		for(int i = 0; i<instance.roadsCost.length; i++) {
-			for(int j = 0; j<instance.roadsCost[i].length; j++) {
-				min = Math.min(min, -instance.roadsCost[i][j]);
+		for(int t = 0; t<instance.horizon; t++) {
+			int a = 0;
+			for(int i = 0; i<instance.roadsCost.length; i++) {
+				a -= instance.roadsCost[i][t];
 			}
+			min = Math.min(min, a);
 		}
 
 		obj = model.intVar("obj", min, sum);
@@ -117,27 +122,80 @@ public class RNMP {
 		model.scalar(isDone, importances, "=", sumUrgency).post();
 
 		IntVar maxPerturbation = model.intVar("maxPerturbation", 0, -min);
-		IntVar[][] perturbations = new IntVar[instance.roadsCost.length][];
+		IntVar[][] perturbations = new IntVar[instance.roadsCost.length][instance.horizon];
 		for(int i = 0; i<instance.roadsCost.length; i++) {
-			perturbations[i] = new IntVar[instance.roadsCost[i].length];
 			for(int j = 0; j<instance.roadsCost[i].length; j++) {
 				perturbations[i][j] = model.intVar("perturbations["+i+"]["+j+"]", new int[]{0, instance.roadsCost[i][j]});
 				model.times(roadsPerturbation[i][j], instance.roadsCost[i][j], perturbations[i][j]).post();
 			}
 		}
-		model.max(maxPerturbation, ArrayUtils.flatten(perturbations)).post();
+		IntVar[] sumPerturbation = model.intVarArray("sumPerturbation", instance.horizon, 0, -min);
+		for(int t = 0; t<instance.horizon; t++) {
+			IntVar[] tmp = new IntVar[instance.roadsCost.length];
+			for(int i = 0; i<tmp.length; i++) {
+				tmp[i] = perturbations[i][t];
+			}
+			model.sum(tmp, "=", sumPerturbation[t]).post();
+		}
+		model.max(maxPerturbation, sumPerturbation).post();
 
 		model.arithm(sumUrgency, "-", maxPerturbation, "=", obj).post();
 
 		model.setObjective(true, obj);
+	}
 
-		// TODO
+	boolean isDoneVar = false;
+	Integer idx = null;
+
+	public void makeSearch() {
 		IntVar[] decVars = new IntVar[2*isDone.length];
 		for(int i = 0; i<decVars.length; i+=2) {
 			decVars[i] = isDone[i/2];
 			decVars[i+1] = getStartWorksheet(i/2);
 		}
-		model.getSolver().setSearch(Search.inputOrderLBSearch(decVars));
+//		model.getSolver().setSearch(Search.inputOrderLBSearch(decVars));
+		//*
+		// TODO --> select first isDone for which importance is higher and instantiate to UB, then corresponding start and instantiate to LB
+		model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
+			@Override
+			public IntVar getVariable(IntVar[] variables) {
+				if(idx != null) {
+					return getStartWorksheet(idx);
+				} else {
+					isDoneVar = true;
+					IntVar res = null;
+					int bestImportance = Integer.MIN_VALUE;
+					for(int i = 0; i<instance.worksheets.length; i++) {
+						if(!isDone[i].isInstantiated() && (res==null || instance.worksheets[i].importance > bestImportance)) {
+							bestImportance = instance.worksheets[i].importance;
+							res = isDone[i];
+							idx = i;
+						}
+					}
+					if(idx == null) {
+						isDoneVar = false;
+						for(int i = 0; i<tasks.length; i++) {
+							if(!getStartWorksheet(i).isInstantiated()) {
+								return getStartWorksheet(i);
+							}
+						}
+					}
+					return res;
+				}
+			}
+		}, new IntValueSelector() {
+			@Override
+			public int selectValue(IntVar var) {
+				if (isDoneVar) {
+					isDoneVar = false;
+					return var.getUB();
+				} else {
+					idx = null;
+					return var.getLB();
+				}
+			}
+		}, decVars));
+		//*/
 	}
 
 	public void constraintWorkRessources() {
@@ -187,11 +245,14 @@ public class RNMP {
 
 		while(model.getSolver().solve()) {
 			best = Arrays.stream(tasks).map(array -> array[0].getStart()).mapToInt(IntVar::getValue).toArray();
+			System.out.println(obj.getValue()+" : "+Arrays.toString(best));
 		}
 
 		FileWriter fw = new FileWriter("results/"+instance.name+".txt");
-		for(int i = 0; i<best.length; i++) {
-			fw.write(i+" "+best[i]+"\n");
+		if(best != null) {
+			for(int i = 0; i<best.length; i++) {
+				fw.write(i+" "+best[i]+"\n");
+			}
 		}
 		fw.close();
 	}

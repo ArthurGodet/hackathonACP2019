@@ -49,12 +49,25 @@ public class PropChannelingRoadPerturbation extends Propagator<IntVar> {
 
     @Override
     public void propagate(int evtmask) throws ContradictionException {
+        int nbWorksheetsFixed = 0;
         for(int i = 0; i<isDone.length; i++) {
+            if(isDone[i].isInstantiated() && tasks[i][0].getStart().isInstantiated()) {
+                nbWorksheetsFixed++;
+            }
             if(isDone[i].isInstantiatedTo(1) && tasks[i][0].getStart().isInstantiated()) {
                 int[] activities = instance.worksheets[i].roadsID;
                 int startTime = tasks[i][0].getStart().getValue();
                 for(int j = 0; j<activities.length; j++) {
                     roadsPerturbation[activities[j]][startTime+j].instantiateTo(1, this);
+                }
+            }
+        }
+        if(nbWorksheetsFixed == isDone.length) {
+            for(int i = 0; i<roadsPerturbation.length; i++) {
+                for(int j = 0; j<roadsPerturbation[i].length; j++) {
+                    if(!roadsPerturbation[i][j].isInstantiated()) {
+                        roadsPerturbation[i][j].instantiateTo(0, this);
+                    }
                 }
             }
         }
