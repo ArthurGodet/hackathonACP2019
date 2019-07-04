@@ -134,7 +134,7 @@ public class RNMPEasy {
             public IntVar getVariable(IntVar[] variables) {
                 int best = -1;
                 for(int i = 0; i<tasks.length; i++) {
-                    if(!getStartWorksheet(i).isInstantiated() && (best==-1 || best<nbPrecedences[i])) {
+                    if(!getStartWorksheet(i).isInstantiated() && (best==-1 || nbPrecedences[best]<nbPrecedences[i])) {
                         best = i;
                     }
                 }
@@ -154,9 +154,9 @@ public class RNMPEasy {
                         break;
                     }
                 }
-                if(nbPrecedences[id] > 0) {
-                    return var.getUB();
-                } else {
+//                if(nbPrecedences[id] > 0) {
+//                    return var.getUB();
+//                } else {
                     int bestStart = -1;
                     int lessInc = Integer.MAX_VALUE;
                     for(int t = var.getLB(); t<=var.getUB(); t++) {
@@ -167,7 +167,7 @@ public class RNMPEasy {
                         }
                     }
                     return bestStart;
-                }
+//                }
             }
         }, decVars));
     }
@@ -214,17 +214,16 @@ public class RNMPEasy {
                 best[i][1] = getStartWorksheet(i).getValue();
             }
             System.out.println(instance.name+" -> "+obj.getValue()+" : "+Arrays.deepToString(best));
+            if(computeObjectiveOfSolution(instance, "results/"+instance.name+".txt")<bestObj) {
+                FileWriter fw = new FileWriter("results/"+instance.name+".txt");
+                for(int i = 0; i<best.length; i++) {
+                    fw.write(best[i][0]+" "+best[i][1]+" "+"\n");
+                }
+                fw.close();
+            }
         }
 
         model.getSolver().printStatistics();
-
-        if(best != null && computeObjectiveOfSolution(instance, "results/"+instance.name+".txt")<bestObj) {
-            FileWriter fw = new FileWriter("results/"+instance.name+".txt");
-            for(int i = 0; i<best.length; i++) {
-                fw.write(best[i][0]+" "+best[i][1]+" "+"\n");
-            }
-            fw.close();
-        }
     }
 
 

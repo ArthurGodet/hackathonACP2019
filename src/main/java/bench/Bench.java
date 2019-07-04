@@ -16,7 +16,7 @@ import java.io.IOException;
 public class Bench {
 
     public static void main(String[] args) throws IOException, ContradictionException {
-        args = new String[]{"5m", "EASY_200_50"};
+        args = new String[]{"5m", "EASY_2000_500"};
 
         if(!"all".equals(args[1])) {
             Instance instance = Factory.fromFile("data/"+args[1]+".json", Instance.class);

@@ -309,7 +309,8 @@ public class RNMP {
 			int i1 = instance.precedences[i][0];
 			int i2 = instance.precedences[i][1];
 			model.post(new Constraint("PRECEDENCES_CONSTRAINT",
-					new PropPrecedences(isDone[i1], getEndWorksheet(i1), isDone[i2], getStartWorksheet(i2))));
+					new PropPrecedences(isDone[i1], getStartWorksheet(i1), getEndWorksheet(i1),
+							isDone[i2], getStartWorksheet(i2), getEndWorksheet(i2))));
 		}
 	}
 
@@ -333,17 +334,16 @@ public class RNMP {
 				}
 			}
 			System.out.println(instance.name+" -> "+obj.getValue()+" : "+Arrays.deepToString(best));
+			if(computeObjectiveOfSolution(instance, "results/"+instance.name+".txt")<bestObj) {
+				FileWriter fw = new FileWriter("results/"+instance.name+".txt");
+				for(int i = 0; i<best.length; i++) {
+					fw.write(best[i][0]+" "+best[i][1]+" "+"\n");
+				}
+				fw.close();
+			}
 		}
 
 		model.getSolver().printStatistics();
-
-		if(best != null && computeObjectiveOfSolution(instance, "results/"+instance.name+".txt")<bestObj) {
-			FileWriter fw = new FileWriter("results/"+instance.name+".txt");
-			for(int i = 0; i<best.length; i++) {
-				fw.write(best[i][0]+" "+best[i][1]+" "+"\n");
-			}
-			fw.close();
-		}
 	}
 
 
