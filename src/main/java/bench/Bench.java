@@ -16,7 +16,21 @@ import java.io.IOException;
 public class Bench {
 
     public static void main(String[] args) throws IOException, ContradictionException {
-        if(!"all".equals(args[1])) {
+        if(args.length == 3) {
+            if(args[0].equals("-lns")) {
+                Instance instance = Factory.fromFile("data/"+args[2]+".json", Instance.class);
+                System.out.println(instance.name);
+                if(instance.name.contains("EASY")) {
+                    RNMPEasy rnmpEasy = new RNMPEasy(instance);
+                    rnmpEasy.lnsSolve(args[1]);
+                } else {
+                    RNMP rnmp = new RNMP(instance);
+                    rnmp.lnsSolve(args[1]);
+                }
+            } else {
+                throw new UnsupportedOperationException("if args has size 3, then args[0] should be -lns");
+            }
+        } else if(!"all".equals(args[1])) {
             Instance instance = Factory.fromFile("data/"+args[1]+".json", Instance.class);
             System.out.println(instance.name);
             if(instance.name.contains("EASY")) {
@@ -26,7 +40,6 @@ public class Bench {
                 RNMP rnmp = new RNMP(instance);
                 rnmp.solve(args[0]);
             }
-            System.in.read();
         } else {
             File folder = new File("data/");
             for(File f : folder.listFiles()) {

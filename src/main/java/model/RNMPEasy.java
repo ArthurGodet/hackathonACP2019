@@ -12,8 +12,12 @@ import data.Factory;
 import data.input.Worksheet;
 import org.chocosolver.solver.Cause;
 import org.chocosolver.solver.Model;
+import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.exception.ContradictionException;
+import org.chocosolver.solver.search.limits.FailCounter;
+import org.chocosolver.solver.search.loop.lns.INeighborFactory;
+import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
 import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.search.strategy.selectors.values.IntValueSelector;
 import org.chocosolver.solver.search.strategy.selectors.variables.VariableSelector;
@@ -228,6 +232,51 @@ public class RNMPEasy {
         model.getSolver().printStatistics();
     }
 
+    public void lnsSolve(String timeLimit) throws IOException, ContradictionException {
+        int bestKnown = computeObjectiveOfSolution(instance, "results/"+instance.name+".txt");
+        IntVar[] ivars = Arrays.stream(tasks).map(Task::getStart).toArray(IntVar[]::new);
+        model.getSolver().limitTime(timeLimit);
+        model.getSolver().showSolutions();
+
+        model.getSolver().plugMonitor((IMonitorSolution) () -> {
+            if(bestKnown<obj.getValue()) {
+                int[][] best = new int[tasks.length][2];
+                for(int i = 0; i<tasks.length; i++) {
+                    best[i][0] = i;
+                    best[i][1] = getStartWorksheet(i).getValue();
+                }
+                try {
+                    FileWriter fw = new FileWriter("results/"+instance.name+".txt");
+                    for(int i = 0; i<best.length; i++) {
+                        fw.write(best[i][0]+" "+best[i][1]+"\n");
+                    }
+                    fw.close();
+                } catch(IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        model.getSolver().setLNS(INeighborFactory.blackBox(ivars), new FailCounter(model.getSolver(), 100));
+        Solution solution = model.getSolver().findOptimalSolution(obj, Model.MAXIMIZE);
+
+        if(bestKnown<solution.getIntVal(obj)) {
+            int[][] best = new int[tasks.length][2];
+            for(int i = 0; i<tasks.length; i++) {
+                best[i][0] = i;
+                best[i][1] = solution.getIntVal(getStartWorksheet(i));
+            }
+            try {
+                FileWriter fw = new FileWriter("results/"+instance.name+".txt");
+                for(int i = 0; i<best.length; i++) {
+                    fw.write(best[i][0]+" "+best[i][1]+"\n");
+                }
+                fw.close();
+            } catch(IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
 
     public static int computeObjectiveOfSolution(Instance instance, String path) throws IOException, ContradictionException {
         RNMP rnmp = new RNMP(instance);

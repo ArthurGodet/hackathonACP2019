@@ -13,8 +13,13 @@ import data.input.RoadMaxBlock;
 import data.input.Worksheet;
 import org.chocosolver.solver.Cause;
 import org.chocosolver.solver.Model;
+import org.chocosolver.solver.Solution;
 import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.exception.ContradictionException;
+import org.chocosolver.solver.search.limits.FailCounter;
+import org.chocosolver.solver.search.loop.lns.INeighborFactory;
+import org.chocosolver.solver.search.loop.lns.neighbors.Neighbor;
+import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
 import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.search.strategy.selectors.values.IntValueSelector;
 import org.chocosolver.solver.search.strategy.selectors.variables.VariableSelector;
@@ -229,50 +234,6 @@ public class RNMP {
 			}
 		}, decVars));
 		//*/
-		//* SEARCH FOR PRECEDENCES
-		if(difficulty == EASY) {
-			int[] nbPrecedences = new int[isDone.length];
-			ArrayList<Integer>[] prec = new ArrayList[isDone.length];
-			for(int k = 0; k<isDone.length; k++) {
-				prec[k] = new ArrayList<>();
-			}
-			for(int i = 0; i<instance.precedences.length; i++) {
-				prec[instance.precedences[i][1]].add(instance.precedences[i][0]);
-			}
-			for(int i = 0; i<nbPrecedences.length; i++) {
-				nbPrecedences[i] = computeNbPrec(prec, i);
-			}
-			model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
-				@Override
-				public IntVar getVariable(IntVar[] variables) {
-					int best = -1;
-					for(int i = 0; i<isDone.length; i++) {
-						if(!getStartWorksheet(i).isInstantiated() && (best==-1 || best<nbPrecedences[i])) {
-							best = i;
-						}
-					}
-					if(best == -1) {
-						return null;
-					} else {
-						return getStartWorksheet(best);
-					}
-				}
-			}, new IntValueSelector() {
-				@Override
-				public int selectValue(IntVar var) {
-					return var.getUB();
-				}
-			}, decVars));
-		}
-		//*/
-	}
-
-	private static int computeNbPrec(ArrayList<Integer>[] prec, int i) {
-		int sum = 0;
-		for(int p : prec[i]) {
-			sum += 1+computeNbPrec(prec, p);
-		}
-		return sum;
 	}
 
 	public void constraintWorkRessources() {
@@ -372,10 +333,85 @@ public class RNMP {
 		return rnmp.obj.getValue();
 	}
 
+	public void lnsSolve(String timeLimit) throws IOException, ContradictionException {
+		int bestKnown = computeObjectiveOfSolution(instance, "results/"+instance.name+".txt");
+		IntVar[] ivars = ArrayUtils.append(isDone, Arrays.stream(tasks).map(array -> array[0].getStart()).toArray(IntVar[]::new));
+		model.getSolver().limitTime(timeLimit);
+		model.getSolver().showSolutions();
+
+		model.getSolver().plugMonitor((IMonitorSolution) () -> {
+			if(bestKnown<obj.getValue()) {
+				int nbDone = 0;
+				for(int i = 0; i<isDone.length; i++) {
+					if(isDone[i].isInstantiatedTo(1)) {
+						nbDone++;
+					}
+				}
+				int[][] best = new int[nbDone][2];
+				int k = 0;
+				for(int i = 0; i<isDone.length; i++) {
+					if(isDone[i].isInstantiatedTo(1)) {
+						best[k][0] = i;
+						best[k][1] = getStartWorksheet(i).getValue();
+						k++;
+					}
+				}
+				try {
+					FileWriter fw = new FileWriter("results/"+instance.name+".txt");
+					for(int i = 0; i<best.length; i++) {
+						fw.write(best[i][0]+" "+best[i][1]+"\n");
+					}
+					fw.close();
+				} catch(IOException ex) {
+					ex.printStackTrace();
+				}
+			}
+		});
+
+		model.getSolver().setLNS(INeighborFactory.blackBox(ivars), new FailCounter(model.getSolver(), 100));
+		Solution solution = model.getSolver().findOptimalSolution(obj, Model.MAXIMIZE);
+
+		if(bestKnown<solution.getIntVal(obj)) {
+			int nbDone = 0;
+			for(int i = 0; i<isDone.length; i++) {
+				if(solution.getIntVal(isDone[i]) == 1) {
+					nbDone++;
+				}
+			}
+			int[][] best = new int[nbDone][2];
+			int k = 0;
+			for(int i = 0; i<isDone.length; i++) {
+				if(solution.getIntVal(isDone[i]) == 1) {
+					best[k][0] = i;
+					best[k][1] = solution.getIntVal(getStartWorksheet(i));
+					k++;
+				}
+			}
+			try {
+				FileWriter fw = new FileWriter("results/"+instance.name+".txt");
+				for(int i = 0; i<best.length; i++) {
+					fw.write(best[i][0]+" "+best[i][1]+"\n");
+				}
+				fw.close();
+			} catch(IOException ex) {
+				ex.printStackTrace();
+			}
+		}
+	}
+
 	public static void main(String[] args) throws IOException, ContradictionException{
-		String instanceName = "HARD_5000_1500";
-		Instance instance = Factory.fromFile("data/"+instanceName+".json", Instance.class);
-		int obj = computeObjectiveOfSolution(instance, "results/"+instanceName+".txt");
-		System.out.println(obj);
+		Instance instance = Factory.fromFile("data/EASY_200_50.json", Instance.class);
+		System.out.println(instance.name);
+		if(instance.name.contains("EASY")) {
+			RNMPEasy rnmpEasy = new RNMPEasy(instance);
+			rnmpEasy.lnsSolve("5m");
+		} else {
+			RNMP rnmp = new RNMP(instance);
+			rnmp.lnsSolve("5m");
+		}
+//		String instanceName = "HARD_5000_1500";
+//		Instance instance = Factory.fromFile("data/"+instanceName+".json", Instance.class);
+//		int obj = computeObjectiveOfSolution(instance, "results/"+instanceName+".txt");
+//		System.out.println(obj);
 	}
 }
