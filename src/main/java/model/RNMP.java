@@ -234,38 +234,40 @@ public class RNMP {
 		}, decVars));
 		//*/
 		//* SEARCH FOR PRECEDENCES
-		int[] nbPrecedences = new int[isDone.length];
-		ArrayList<Integer>[] prec = new ArrayList[isDone.length];
-		for(int k = 0; k<isDone.length; k++) {
-			prec[k] = new ArrayList<>();
-		}
-		for(int i = 0; i<instance.precedences.length; i++) {
-			prec[instance.precedences[i][1]].add(instance.precedences[i][0]);
-		}
-		for(int i = 0; i<nbPrecedences.length; i++) {
-			nbPrecedences[i] = computeNbPrec(prec, i);
-		}
-		model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
-			@Override
-			public IntVar getVariable(IntVar[] variables) {
-				int best = -1;
-				for(int i = 0; i<isDone.length; i++) {
-					if(!getStartWorksheet(i).isInstantiated() && (best==-1 || best<nbPrecedences[i])) {
-						best = i;
+		if(difficulty == EASY) {
+			int[] nbPrecedences = new int[isDone.length];
+			ArrayList<Integer>[] prec = new ArrayList[isDone.length];
+			for(int k = 0; k<isDone.length; k++) {
+				prec[k] = new ArrayList<>();
+			}
+			for(int i = 0; i<instance.precedences.length; i++) {
+				prec[instance.precedences[i][1]].add(instance.precedences[i][0]);
+			}
+			for(int i = 0; i<nbPrecedences.length; i++) {
+				nbPrecedences[i] = computeNbPrec(prec, i);
+			}
+			model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
+				@Override
+				public IntVar getVariable(IntVar[] variables) {
+					int best = -1;
+					for(int i = 0; i<isDone.length; i++) {
+						if(!getStartWorksheet(i).isInstantiated() && (best==-1 || best<nbPrecedences[i])) {
+							best = i;
+						}
+					}
+					if(best == -1) {
+						return null;
+					} else {
+						return getStartWorksheet(best);
 					}
 				}
-				if(best == -1) {
-					return null;
-				} else {
-					return getStartWorksheet(best);
+			}, new IntValueSelector() {
+				@Override
+				public int selectValue(IntVar var) {
+					return var.getUB();
 				}
-			}
-		}, new IntValueSelector() {
-			@Override
-			public int selectValue(IntVar var) {
-				return var.getUB();
-			}
-		}, decVars));
+			}, decVars));
+		}
 		//*/
 	}
 
