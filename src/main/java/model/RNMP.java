@@ -3,6 +3,7 @@ package model;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
 
@@ -232,6 +233,48 @@ public class RNMP {
 			}
 		}, decVars));
 		//*/
+		//* SEARCH FOR PRECEDENCES
+		int[] nbPrecedences = new int[isDone.length];
+		ArrayList<Integer>[] prec = new ArrayList[isDone.length];
+		for(int k = 0; k<isDone.length; k++) {
+			prec[k] = new ArrayList<>();
+		}
+		for(int i = 0; i<instance.precedences.length; i++) {
+			prec[instance.precedences[i][1]].add(instance.precedences[i][0]);
+		}
+		for(int i = 0; i<nbPrecedences.length; i++) {
+			nbPrecedences[i] = computeNbPrec(prec, i);
+		}
+		model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
+			@Override
+			public IntVar getVariable(IntVar[] variables) {
+				int best = -1;
+				for(int i = 0; i<isDone.length; i++) {
+					if(!getStartWorksheet(i).isInstantiated() && (best==-1 || best<nbPrecedences[i])) {
+						best = i;
+					}
+				}
+				if(best == -1) {
+					return null;
+				} else {
+					return getStartWorksheet(best);
+				}
+			}
+		}, new IntValueSelector() {
+			@Override
+			public int selectValue(IntVar var) {
+				return var.getUB();
+			}
+		}, decVars));
+		//*/
+	}
+
+	private static int computeNbPrec(ArrayList<Integer>[] prec, int i) {
+		int sum = 0;
+		for(int p : prec[i]) {
+			sum += 1+computeNbPrec(prec, p);
+		}
+		return sum;
 	}
 
 	public void constraintWorkRessources() {
@@ -273,14 +316,16 @@ public class RNMP {
 		}
 	}
 
-	public void solve(String timeLimit) throws IOException {
+	public void solve(String timeLimit) throws IOException, ContradictionException {
 		if(timeLimit != null) {
 			model.getSolver().limitTime(timeLimit);
 		}
 		int[][] best = null;
+		Integer bestObj = 0;
 
 		while(model.getSolver().solve()) {
 			int nbDone = (int) Arrays.stream(isDone).filter(b -> b.isInstantiatedTo(1)).count();
+			bestObj = obj.getValue();
 			best = new int[nbDone][2];
 			int k = 0;
 			for(int i = 0; i<isDone.length; i++) {
@@ -295,7 +340,7 @@ public class RNMP {
 
 		model.getSolver().printStatistics();
 
-		if(best != null) {
+		if(best != null && computeObjectiveOfSolution(instance, "results/"+instance.name+".txt")<bestObj) {
 			FileWriter fw = new FileWriter("results/"+instance.name+".txt");
 			for(int i = 0; i<best.length; i++) {
 				fw.write(best[i][0]+" "+best[i][1]+" "+"\n");
