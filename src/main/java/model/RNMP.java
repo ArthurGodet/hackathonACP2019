@@ -1,5 +1,6 @@
 package model;
 
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -320,6 +321,7 @@ public class RNMP {
 		}
 		int[][] best = null;
 		Integer bestObj = 0;
+		int bestKnown = computeObjectiveOfSolution(instance, "results/"+instance.name+".txt");
 
 		while(model.getSolver().solve()) {
 			int nbDone = (int) Arrays.stream(isDone).filter(b -> b.isInstantiatedTo(1)).count();
@@ -334,7 +336,7 @@ public class RNMP {
 				}
 			}
 			System.out.println(instance.name+" -> "+obj.getValue()+" : "+Arrays.deepToString(best));
-			if(computeObjectiveOfSolution(instance, "results/"+instance.name+".txt")<bestObj) {
+			if(bestKnown<bestObj) {
 				FileWriter fw = new FileWriter("results/"+instance.name+".txt");
 				for(int i = 0; i<best.length; i++) {
 					fw.write(best[i][0]+" "+best[i][1]+" "+"\n");
@@ -349,6 +351,9 @@ public class RNMP {
 
 	public static int computeObjectiveOfSolution(Instance instance, String path) throws IOException, ContradictionException {
 		RNMP rnmp = new RNMP(instance);
+		if(!new File(path).exists()) {
+			return Integer.MIN_VALUE;
+		}
 		Scanner scanner = new Scanner(new FileReader(path));
 		while(scanner.hasNextLine()) {
 			String[] line = scanner.nextLine().split(" ");
