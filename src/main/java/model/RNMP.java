@@ -21,6 +21,7 @@ import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.search.limits.FailCounter;
 import org.chocosolver.solver.search.loop.lns.INeighborFactory;
 import org.chocosolver.solver.search.loop.lns.neighbors.Neighbor;
+import org.chocosolver.solver.search.loop.lns.neighbors.RandomNeighborhood;
 import org.chocosolver.solver.search.loop.monitors.IMonitorSolution;
 import org.chocosolver.solver.search.strategy.Search;
 import org.chocosolver.solver.search.strategy.selectors.values.IntValueSelector;
@@ -405,9 +406,10 @@ public class RNMP {
 		int bestKnown = computeObjectiveOfSolution(instance, "results/"+instance.name+".txt");
 		IntVar[] ivars = ArrayUtils.append(isDone, Arrays.stream(tasks).map(array -> array[0].getStart()).toArray(IntVar[]::new));
 		model.getSolver().limitTime(timeLimit);
-		model.getSolver().showSolutions();
+//		model.getSolver().showSolutions();
 
 		model.getSolver().plugMonitor((IMonitorSolution) () -> {
+			System.out.println(obj.getValue());
 			if(bestKnown<obj.getValue()) {
 				int nbDone = 0;
 				for(int i = 0; i<isDone.length; i++) {
@@ -436,8 +438,8 @@ public class RNMP {
 			}
 		});
 
-		model.getSolver().setLNS(INeighborFactory.blackBox(ivars), new FailCounter(model.getSolver(), 100));
-
+		model.getSolver().setLNS(INeighborFactory.random(ivars), new FailCounter(model.getSolver(), 100));
+		
 		Solution solution = model.getSolver().findOptimalSolution(obj, Model.MAXIMIZE);
 
 		if(bestKnown<solution.getIntVal(obj)) {

@@ -139,6 +139,29 @@ public class RNMPEasy {
         model.getSolver().setSearch(Search.intVarSearch(new VariableSelector<IntVar>() {
             @Override
             public IntVar getVariable(IntVar[] variables) {
+                /*
+                int lessInc = Integer.MAX_VALUE;
+                int bestIdx = -1;
+                for(int i = 0; i<tasks.length; i++) {
+                    IntVar var = getStartWorksheet(i);
+                    if(!var.isInstantiated()) {
+                        int a = Integer.MAX_VALUE;
+                        for(int t = var.getLB(); t<=var.getUB(); t=var.nextValue(t)) {
+                            a = Math.min(a, computeIncreasePerturbation(i, t));
+                        }
+                        if(a < lessInc) {
+                            lessInc = a;
+                            bestIdx = i;
+                        }
+                    }
+                }
+                if(bestIdx == -1) {
+                    return null;
+                } else {
+                    return getStartWorksheet(bestIdx);
+                }
+                //*/
+                //*
                 int best = -1;
                 for(int i = 0; i<tasks.length; i++) {
                     if(!getStartWorksheet(i).isInstantiated() && (best==-1 || nbPrecedences[best]<nbPrecedences[i])) {
@@ -150,6 +173,7 @@ public class RNMPEasy {
                 } else {
                     return getStartWorksheet(best);
                 }
+                //*/
             }
         }, new IntValueSelector() {
             @Override
@@ -280,9 +304,10 @@ public class RNMPEasy {
         int bestKnown = computeObjectiveOfSolution(instance, "results/"+instance.name+".txt");
         IntVar[] ivars = Arrays.stream(tasks).map(Task::getStart).toArray(IntVar[]::new);
         model.getSolver().limitTime(timeLimit);
-        model.getSolver().showSolutions();
+//        model.getSolver().showSolutions();
 
         model.getSolver().plugMonitor((IMonitorSolution) () -> {
+            System.out.println(obj.getValue());
             if(bestKnown<obj.getValue()) {
                 int[][] best = new int[tasks.length][2];
                 for(int i = 0; i<tasks.length; i++) {
@@ -301,7 +326,7 @@ public class RNMPEasy {
             }
         });
 
-        model.getSolver().setLNS(INeighborFactory.blackBox(ivars), new FailCounter(model.getSolver(), 100));
+        model.getSolver().setLNS(INeighborFactory.random(ivars), new FailCounter(model.getSolver(), 100));
         Solution solution = model.getSolver().findOptimalSolution(obj, Model.MAXIMIZE);
 
         if(bestKnown<solution.getIntVal(obj)) {
