@@ -16,7 +16,7 @@ import java.io.IOException;
 public class Bench {
 
     public static void main(String[] args) throws IOException, ContradictionException {
-        args = new String[]{"-lns", "30m", "EASY_5000_1500"};
+//        args = new String[]{"-lns", "30m", "EASY_5000_1500"};
 
         if(args.length == 3) {
             if(args[0].equals("-lns")) {

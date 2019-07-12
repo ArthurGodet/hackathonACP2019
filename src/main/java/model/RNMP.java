@@ -439,7 +439,7 @@ public class RNMP {
 		});
 
 		model.getSolver().setLNS(INeighborFactory.random(ivars), new FailCounter(model.getSolver(), 100));
-		
+
 		Solution solution = model.getSolver().findOptimalSolution(obj, Model.MAXIMIZE);
 
 		if(bestKnown<solution.getIntVal(obj)) {
